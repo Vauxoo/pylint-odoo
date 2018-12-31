@@ -381,6 +381,12 @@ class NoModuleChecker(misc.PylintOdooChecker):
         }),
     )
 
+    odoo_check_versions = {
+        'prefer-other-formatting': {
+            'max_odoo_version': '11.0',
+        },
+    }
+
     def open(self):
         super(NoModuleChecker, self).open()
         self.config.deprecated_field_parameters = \
