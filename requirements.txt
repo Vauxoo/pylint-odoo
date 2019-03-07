@@ -14,3 +14,7 @@ isort==4.3.4
 whichcraft
 rfc3986
 six
+
+# pylint vauxoo custom packages
+translate-toolkit==2.3	
+polib==1.1
