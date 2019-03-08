@@ -24,13 +24,14 @@ EXPECTED_ERRORS = {
     'dangerous-filter-wo-user': 1,
     'dangerous-view-replace-wo-priority': 5,
     'deprecated-openerp-xml-node': 5,
+    'development-status-allowed': 1,
     'duplicate-id-csv': 2,
     'duplicate-xml-fields': 9,
     'duplicate-xml-record-id': 2,
     'file-not-used': 6,
     'incoherent-interpreter-exec-perm': 3,
     'invalid-commit': 4,
-    'javascript-lint': 13,
+    'javascript-lint': 25,
     'license-allowed': 1,
     'manifest-author-string': 1,
     'manifest-deprecated-key': 1,
@@ -53,7 +54,7 @@ EXPECTED_ERRORS = {
     'openerp-exception-warning': 3,
     'redundant-modulename-xml': 1,
     'rst-syntax-error': 2,
-    'sql-injection': 15,
+    'sql-injection': 18,
     'translation-field': 2,
     'translation-required': 15,
     'translation-contains-variable': 10,
@@ -77,7 +78,6 @@ EXPECTED_ERRORS = {
 EXPECTED_ERRORS.update({
     'consider-add-field-help': 4,
     'import-error': 7,
-    'manifest-required-author': 4,
     'missing-import-error': 9,
     'missing-manifest-dependency': 7,
     'missing-newline-extrafiles': 4,
@@ -96,10 +96,12 @@ def profiling(profile):
 
 class MainTest(unittest.TestCase):
     def setUp(self):
+        dummy_cfg = os.path.join(gettempdir(), 'nousedft.cfg')
+        open(dummy_cfg, "w").write("")
         self.default_options = [
             '--load-plugins=pylint_odoo', '--reports=no', '--msg-template='
             '"{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}"',
-            '--output-format=colorized',
+            '--output-format=colorized', '--rcfile=%s' % os.devnull,
         ]
         path_modules = os.path.join(
             os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
@@ -138,7 +140,10 @@ class MainTest(unittest.TestCase):
         sys.path.extend(paths)
         cmd = self.default_options + extra_params + paths
         with profiling(self.profile):
-            res = Run(cmd, None, False)
+            try:
+                res = Run(cmd, do_exit=False)  # pylint2
+            except TypeError:
+                res = Run(cmd, exit=False)  # pylint1
         return res
 
     def test_10_path_dont_exist(self):
@@ -310,6 +315,34 @@ class MainTest(unittest.TestCase):
         real_errors = pylint_res.linter.stats['by_msg']
         expected_errors['manifest-required-author'] = 3
         self.assertDictEqual(real_errors, expected_errors)
+
+        # Testing deprecated attribute
+        extra_params[0] = ('--manifest_required_author='
+                           'Odoo Community Association (OCA)')
+        pylint_res = self.run_pylint(self.paths_modules, extra_params)
+        real_errors = pylint_res.linter.stats['by_msg']
+        expected_errors_deprecated = {
+            'manifest-required-author': (
+                EXPECTED_ERRORS['manifest-required-author']),
+        }
+        self.assertDictEqual(real_errors, expected_errors_deprecated)
+
+    def test_120_import_error_skip(self):
+        """Missing import error skipped for >=12.0"""
+        extra_params = [
+            '--valid_odoo_versions=11.0',
+            '--disable=all',
+            '--enable=missing-import-error',
+        ]
+        pylint_res = self.run_pylint(self.paths_modules, extra_params)
+        real_errors_110 = pylint_res.linter.stats['by_msg']
+        self.assertEqual(self.expected_errors.get('missing-import-error'),
+                         real_errors_110.get('missing-import-error'))
+
+        extra_params[0] = '--valid_odoo_versions=12.0'
+        pylint_res = self.run_pylint(self.paths_modules, extra_params)
+        real_errors_120 = pylint_res.linter.stats['by_msg']
+        self.assertFalse(real_errors_120)
 
 
 if __name__ == '__main__':

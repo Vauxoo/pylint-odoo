@@ -106,14 +106,16 @@ ODOO_MSGS = {
     ),
     'W%d35' % settings.BASE_OMODULE_ID: (
         'External dependency "%s" without ImportError. More info: '
-        'https://github.com/OCA/maintainer-tools/blob/master/CONTRIBUTING.md'
+        'https://github.com/OCA/odoo-community.org/blob/master/website/'
+        'Contribution/CONTRIBUTING.rst'
         '#external-dependencies',
         'missing-import-error',
         settings.DESC_DFLT
     ),
     'W%d36' % settings.BASE_OMODULE_ID: (
         'Missing external dependency "%s" from manifest. More info: '
-        'https://github.com/OCA/maintainer-tools/blob/master/CONTRIBUTING.md'
+        'https://github.com/OCA/odoo-community.org/blob/master/website/'
+        'Contribution/CONTRIBUTING.rst'
         '#external-dependencies',
         'missing-manifest-dependency',
         settings.DESC_DFLT
@@ -266,6 +268,12 @@ class ModuleChecker(misc.WrapperModuleChecker):
         }),
     )
 
+    odoo_check_versions = {
+        'missing-import-error': {
+            'max_odoo_version': '11.0',
+        },
+    }
+
     # Custom options for check of vx to avoid oca conflicts
     options += (
         ('po-lint-enable', {
@@ -292,7 +300,7 @@ class ModuleChecker(misc.WrapperModuleChecker):
                 'consider-merging-classes-inherited', node.lineno):
             return
         node_left = node.targets[0]
-        if not isinstance(node_left, astroid.node_classes.AssName) or \
+        if not isinstance(node_left, astroid.node_classes.AssignName) or \
                 node_left.name not in ('_inherit', '_name') or \
                 not isinstance(node.value, astroid.node_classes.Const) or \
                 not isinstance(node.parent, astroid.ClassDef):
