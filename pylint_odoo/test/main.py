@@ -78,7 +78,6 @@ EXPECTED_ERRORS = {
 EXPECTED_ERRORS.update({
     'consider-add-field-help': 4,
     'import-error': 7,
-    'manifest-required-author': 4,
     'missing-import-error': 9,
     'missing-manifest-dependency': 7,
     'missing-newline-extrafiles': 4,
