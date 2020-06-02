@@ -222,6 +222,11 @@ ODOO_MSGS = {
         'translation-contains-variable',
         settings.DESC_DFLT
     ),
+    'W%d16' % settings.BASE_NOMODULE_ID: (
+        'Print used. Use `logger` instead.',
+        'print-used',
+        settings.DESC_DFLT
+    ),
     'F%d01' % settings.BASE_NOMODULE_ID: (
         'File "%s": "%s" not found.',
         'resource-not-exist',
@@ -446,6 +451,10 @@ class NoModuleChecker(misc.PylintOdooChecker):
 
         return is_bin_op or is_format
 
+    @utils.check_messages("print-used")
+    def visit_print(self, node):
+        self.add_message("print-used", node=node)
+
     @utils.check_messages('translation-field', 'invalid-commit',
                           'method-compute', 'method-search', 'method-inverse',
                           'sql-injection',
@@ -454,12 +463,15 @@ class NoModuleChecker(misc.PylintOdooChecker):
                           'consider-add-field-help', 'prefer-other-formatting',
                           'translation-required',
                           'translation-contains-variable',
+                          'print-used',
                           )
     def visit_call(self, node):
-        node_infer = utils.safe_infer(node.func)
-        if utils.is_builtin_object(node_infer) and \
+        infer_node = utils.safe_infer(node.func)
+        if utils.is_builtin_object(infer_node) and \
                 self.get_func_name(node.func) == 'format':
             self.add_message('prefer-other-formatting', node=node)
+        if utils.is_builtin_object(infer_node) and infer_node.name == 'print':
+            self.add_message('print-used', node=node)
         if ('fields' == self.get_func_lib(node.func) and
                 isinstance(node.parent, astroid.Assign) and
                 isinstance(node.parent.parent, astroid.ClassDef)):
