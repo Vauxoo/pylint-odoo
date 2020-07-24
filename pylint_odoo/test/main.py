@@ -82,12 +82,11 @@ EXPECTED_ERRORS = {
 # Checks not oca just vx to avoid oca conflicts
 EXPECTED_ERRORS.update({
     'consider-add-field-help': 4,
-    'import-error': 7,
+    'import-error': 10,
     'missing-import-error': 9,
     'missing-manifest-dependency': 7,
     'missing-newline-extrafiles': 4,
-    'po-lint': 4,
-    'po-syntax-error': 1,
+    'po-lint': 2,
     'prefer-other-formatting': 10,
 })
 

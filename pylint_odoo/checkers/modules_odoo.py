@@ -174,11 +174,6 @@ ODOO_MSGS = {
 
 # Checks not oca just vx to avoid oca conflicts
 ODOO_MSGS.update({
-    'E%d03' % settings.BASE_OMODULE_ID: (
-        '%s',
-        'po-syntax-error',
-        settings.DESC_DFLT
-    ),
     'W%d11' % settings.BASE_OMODULE_ID: (
         '%s',
         'po-lint',
@@ -898,23 +893,6 @@ class ModuleChecker(misc.WrapperModuleChecker):
             errors = self.check_js_lint(js_file, self.config.jslintrc)
             for error in errors:
                 self.msg_args.append((js_file_rel + error,))
-        if self.msg_args:
-            return False
-        return True
-
-    def _check_po_syntax_error(self):
-        """Check po lint
-        :return: False if exists errors and
-                 add list of errors in self.msg_args
-        """
-        self.msg_args = []
-
-        for po_file in self.filter_files_ext('po', relpath=True):
-            po_path = os.path.join(self.module_path, po_file)
-            errors = self.check_po_syntax_error(po_path)
-            for error in errors:
-                self.msg_args.append((po_file + error))
-
         if self.msg_args:
             return False
         return True

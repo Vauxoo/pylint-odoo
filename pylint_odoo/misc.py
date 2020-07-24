@@ -504,24 +504,6 @@ class WrapperModuleChecker(PylintOdooChecker):
                 output.strip('\n').split('\n')[:-2])
         return output_spplited
 
-    def check_po_syntax_error(self, fname):
-        """Check po lint in fname.
-        :param fname: String with full path of file to check
-        :return: Return list of errors.
-        """
-        newargv = ['pofilter', fname]
-
-        with custom_sys_argv(newargv):
-            parser = cmdlineparser()
-            options = parser.parse_args()[0]
-
-        with open(options.input, 'r') as pofile:
-            fromfile = factory.getobject(pofile)
-
-        polinter = PoLinter(options=options,
-                            checkerconfig=build_checkerconfig(options))
-        return list(polinter.get_syntax_error(fromfile))
-
     def check_po_lint(self, fname, enabled, disabled):
         """Check po lint in fname.
         :param fname: String with full path of file to check
