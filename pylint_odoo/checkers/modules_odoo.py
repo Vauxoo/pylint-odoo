@@ -6,6 +6,8 @@ import re
 
 import astroid
 import isort
+import polib
+from collections import defaultdict
 from pylint.checkers import utils
 from six import next, string_types
 
@@ -152,16 +154,26 @@ ODOO_MSGS = {
         'character-not-valid-in-resource-link',
         settings.DESC_DFLT
     ),
+    'W%d47' % settings.BASE_OMODULE_ID: (
+        '%s Duplicate PO message definition "%s" in lines %s',
+        'duplicate-po-message-definition',
+        settings.DESC_DFLT
+    ),
+    'E%d12' % settings.BASE_OMODULE_ID: (
+        '%s %s',
+        'po-syntax-error',
+        settings.DESC_DFLT
+    ),
+    'W%d68' % settings.BASE_OMODULE_ID: (
+        '%s %s',
+        'po-msgstr-variables',
+        settings.DESC_DFLT
+    ),
 }
 
 
 # Checks not oca just vx to avoid oca conflicts
 ODOO_MSGS.update({
-    'E%d03' % settings.BASE_OMODULE_ID: (
-        '%s',
-        'po-syntax-error',
-        settings.DESC_DFLT
-    ),
     'W%d11' % settings.BASE_OMODULE_ID: (
         '%s',
         'po-lint',
@@ -193,6 +205,8 @@ DFLT_IMPORT_NAME_WHITELIST = [
     'requests', 'serial', 'simplejson', 'six', 'suds',
     'unittest2', 'urllib3', 'usb', 'vatnumber', 'vobject', 'werkzeug',
     'wsgiref', 'xlsxwriter', 'xlwt', 'yaml',
+    # OpenUpgrade migration
+    'openupgradelib'
 ]
 DFTL_JSLINTRC = os.path.join(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
@@ -480,6 +494,99 @@ class ModuleChecker(misc.WrapperModuleChecker):
                     len(handler.body) == 1 and
                     isinstance(handler.body[0], astroid.node_classes.Pass)):
                 self.add_message('except-pass', node=handler)
+
+    def _get_po_line_number(self, po_entry):
+        """Get line number of a PO entry similar to 'msgfmt' output
+        entry.linenum returns line number of the definition of the entry
+        'msgfmt' returns line number of the 'msgid'
+        This method also gets line number of the 'msgid'
+        """
+        linenum = po_entry.linenum
+        for line in str(po_entry).split('\n'):
+            if not line.startswith('#'):
+                break
+            linenum += 1
+        return linenum
+
+    def _check_po_syntax_error(self):
+        """Check syntax error in PO files"""
+        self.msg_args = []
+        for po_file in self.filter_files_ext('po') + self.filter_files_ext('pot'):
+            try:
+                polib.pofile(os.path.join(self.module_path, po_file))
+            except (IOError, OSError) as oe:
+                fname = os.path.join(self.module_path, po_file)
+                msg = str(oe).replace(fname + ' ', '').strip()
+                self.msg_args.append((po_file, msg))
+
+    def _check_duplicate_po_message_definition(self):
+        """Check duplicate message definition (message-id)
+        in all entries of PO files
+
+        We are not using `check_for_duplicates` parameter of polib.pofile method
+            e.g. polib.pofile(..., check_for_duplicates=True)
+        Because the output is:
+            raise ValueError('Entry "%s" already exists' % entry.msgid)
+        It doesn't show the number of lines duplicated
+        It shows the entire string of the message_id without truncating it
+            or replacing newlines
+        """
+        self.msg_args = []
+        for po_file in self.filter_files_ext('po') + self.filter_files_ext('pot'):
+            try:
+                po = polib.pofile(os.path.join(self.module_path, po_file))
+            except (IOError, OSError):
+                # If there is a syntax error, it will be covered in another check
+                continue
+            duplicated = defaultdict(list)
+            for entry in po:
+                # Using `set` in order to fix false red
+                # if the same entry has duplicated occurrences
+                for occurrence in set(entry.occurrences):
+                    duplicated[(hash(entry.msgid), hash(occurrence))].append(entry)
+            for entries in duplicated.values():
+                if len(entries) < 2:
+                    continue
+                linenum = self._get_po_line_number(entries[0])
+                po_fname_linenum = "%s:%d" % (po_file, linenum)
+                duplicated = ', '.join(str(self._get_po_line_number(x))
+                                       for x in entries[1:])
+                msg_id_short = re.sub(r"[\n\t]*", "", entries[0].msgid[:40]).strip()
+                if len(entries[0].msgid) > 40:
+                    msg_id_short = "%s..." % msg_id_short
+                self.msg_args.append((po_fname_linenum, msg_id_short, duplicated))
+
+    def _check_po_msgstr_variables(self):
+        """Check if 'msgid' is using 'str' variables like '%s'
+        So translation 'msgstr' must be the same number of variables too"""
+        self.msg_args = []
+        for po_file in self.filter_files_ext('po'):
+            try:
+                po = polib.pofile(os.path.join(self.module_path, po_file))
+            except (IOError, OSError):
+                # If there is a syntax error, it will be covered in another check
+                continue
+            for entry in po:
+                if not entry.msgstr or 'python-format' not in entry.flags:
+                    # skip untranslated entry
+                    # skip if it is not a python format
+                    # because "%s"%var won't be parsed
+                    continue
+                linenum = self._get_po_line_number(entry)
+                po_fname_linenum = "%s:%d" % (po_file, linenum)
+                try:
+                    self.parse_printf(entry.msgid, entry.msgstr)
+                except misc.StringParseError as str_parse_exc:
+                    self.msg_args.append((
+                        po_fname_linenum, "Translation string couldn't be parsed "
+                        "correctly using string%%variables %s" % str_parse_exc))
+                    continue
+                try:
+                    self.parse_format(entry.msgid, entry.msgstr)
+                except misc.StringParseError as str_parse_exc:
+                    self.msg_args.append((
+                        po_fname_linenum, "Translation string couldn't be parsed "
+                        "correctly using string.format() %s" % str_parse_exc))
 
     def _check_rst_syntax_error(self):
         """Check if rst file there is syntax error
@@ -786,23 +893,6 @@ class ModuleChecker(misc.WrapperModuleChecker):
             errors = self.check_js_lint(js_file, self.config.jslintrc)
             for error in errors:
                 self.msg_args.append((js_file_rel + error,))
-        if self.msg_args:
-            return False
-        return True
-
-    def _check_po_syntax_error(self):
-        """Check po lint
-        :return: False if exists errors and
-                 add list of errors in self.msg_args
-        """
-        self.msg_args = []
-
-        for po_file in self.filter_files_ext('po', relpath=True):
-            po_path = os.path.join(self.module_path, po_file)
-            errors = self.check_po_syntax_error(po_path)
-            for error in errors:
-                self.msg_args.append((po_file + error))
-
         if self.msg_args:
             return False
         return True

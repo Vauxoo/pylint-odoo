@@ -26,6 +26,7 @@ EXPECTED_ERRORS = {
     'deprecated-openerp-xml-node': 5,
     'development-status-allowed': 1,
     'duplicate-id-csv': 2,
+    'duplicate-po-message-definition': 2,
     'duplicate-xml-fields': 9,
     'duplicate-xml-record-id': 2,
     'file-not-used': 6,
@@ -53,6 +54,8 @@ EXPECTED_ERRORS = {
     'odoo-addons-relative-import': 4,
     'old-api7-method-defined': 2,
     'openerp-exception-warning': 3,
+    'po-syntax-error': 1,
+    'po-msgstr-variables': 6,
     'print-used': 1,
     'redundant-modulename-xml': 1,
     'rst-syntax-error': 2,
@@ -79,12 +82,11 @@ EXPECTED_ERRORS = {
 # Checks not oca just vx to avoid oca conflicts
 EXPECTED_ERRORS.update({
     'consider-add-field-help': 4,
-    'import-error': 7,
+    'import-error': 10,
     'missing-import-error': 9,
     'missing-manifest-dependency': 7,
     'missing-newline-extrafiles': 4,
-    'po-lint': 4,
-    'po-syntax-error': 1,
+    'po-lint': 2,
     'prefer-other-formatting': 10,
 })
 
