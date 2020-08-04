@@ -136,6 +136,10 @@ def custom_sys_argv(args):
     sys.argv = oldargv
 
 
+# Custom change to support future 14.0 early in Vauxoo
+DFTL_VALID_ODOO_VERSIONS.append('14.0')
+
+
 # TODO: Change all methods here
 class PylintOdooChecker(BaseChecker):
 
