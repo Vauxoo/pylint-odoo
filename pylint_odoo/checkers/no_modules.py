@@ -133,6 +133,11 @@ ODOO_MSGS = {
         'sql-injection',
         settings.DESC_DFLT
     ),
+    'E%d04' % settings.BASE_NOMODULE_ID: (
+        'The maintainers key in the manifest file must be a list of strings',
+        'manifest-maintainers-list',
+        settings.DESC_DFLT
+    ),
     'C%d01' % settings.BASE_NOMODULE_ID: (
         'One of the following authors must be present in manifest: %s',
         'manifest-required-author',
@@ -187,7 +192,8 @@ ODOO_MSGS = {
         settings.DESC_DFLT
     ),
     'C%d11' % settings.BASE_NOMODULE_ID: (
-        'Manifest key development_status "%s" not allowed',
+        'Manifest key development_status "%s" not allowed. '
+        'Use one of: %s.',
         'development-status-allowed',
         settings.DESC_DFLT
     ),
@@ -672,7 +678,8 @@ class NoModuleChecker(misc.PylintOdooChecker):
         'license-allowed', 'manifest-author-string', 'manifest-deprecated-key',
         'manifest-required-author', 'manifest-required-key',
         'manifest-version-format', 'resource-not-exist',
-        'website-manifest-key-not-valid-uri', 'development-status-allowed')
+        'website-manifest-key-not-valid-uri', 'development-status-allowed',
+        'manifest-maintainers-list')
     def visit_dict(self, node):
         if not os.path.basename(self.linter.current_file) in \
                 settings.MANIFEST_FILES \
@@ -753,8 +760,16 @@ class NoModuleChecker(misc.PylintOdooChecker):
         dev_status = manifest_dict.get('development_status')
         if (dev_status and
                 dev_status not in self.config.development_status_allowed):
+            valid_status = ", ".join(self.config.development_status_allowed)
             self.add_message('development-status-allowed',
-                             node=node, args=(dev_status,))
+                             node=node, args=(dev_status, valid_status))
+
+        # Check maintainers key is a list of strings
+        maintainers = manifest_dict.get('maintainers')
+        if(maintainers and (not isinstance(maintainers, list)
+                            or any(not isinstance(item, str) for item in maintainers))):
+            self.add_message('manifest-maintainers-list',
+                             node=node)
 
     @utils.check_messages('api-one-multi-together',
                           'copy-wo-api-one', 'api-one-deprecated',
