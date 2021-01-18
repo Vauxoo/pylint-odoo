@@ -138,6 +138,13 @@ ODOO_MSGS = {
         'manifest-maintainers-list',
         settings.DESC_DFLT
     ),
+    'E%d05' % settings.BASE_NOMODULE_ID: (
+        'Use of `str.format` method in a translated string. '
+        'Use `_("%(varname)s") % {"varname": value}` instead. '
+        'Be careful https://lucumr.pocoo.org/2016/12/29/careful-with-str-format',
+        'str-format-used',
+        settings.DESC_DFLT
+    ),
     'C%d01' % settings.BASE_NOMODULE_ID: (
         'One of the following authors must be present in manifest: %s',
         'manifest-required-author',
@@ -231,6 +238,12 @@ ODOO_MSGS = {
     'W%d16' % settings.BASE_NOMODULE_ID: (
         'Print used. Use `logger` instead.',
         'print-used',
+        settings.DESC_DFLT
+    ),
+    'W%d20' % settings.BASE_NOMODULE_ID: (
+        'Translation method _(%s) is using positional string printf formatting. '
+        'Use named placeholder `_("%%(placeholder)s")` instead.',
+        'translation-positional-used',
         settings.DESC_DFLT
     ),
     'F%d01' % settings.BASE_NOMODULE_ID: (
@@ -512,7 +525,8 @@ class NoModuleChecker(misc.PylintOdooChecker):
                           'consider-add-field-help', 'prefer-other-formatting',
                           'translation-required',
                           'translation-contains-variable',
-                          'print-used',
+                          'print-used', 'translation-positional-used',
+                          'str-format-used',
                           )
     def visit_call(self, node):
         infer_node = utils.safe_infer(node.func)
@@ -633,6 +647,7 @@ class NoModuleChecker(misc.PylintOdooChecker):
                 and node.func.name == '_'
                 and node.args):
             wrong = ''
+            right = ''
             arg = node.args[0]
             # case: _('...' % (variables))
             if isinstance(arg, astroid.BinOp) and arg.op == '%':
@@ -645,16 +660,29 @@ class NoModuleChecker(misc.PylintOdooChecker):
                     and isinstance(arg.func, astroid.Attribute)
                     and isinstance(arg.func.expr, astroid.Const)
                     and arg.func.attrname == 'format'):
+                self.add_message('str-format-used', node=node)
                 wrong = arg.as_string()
                 params_as_string = ', '.join([
                     x.as_string()
                     for x in itertools.chain(arg.args, arg.keywords or [])])
                 right = '_(%s).format(%s)' % (
                     arg.func.expr.as_string(), params_as_string)
-            if wrong:
+            if wrong and right:
                 self.add_message(
                     'translation-contains-variable', node=node,
                     args=(wrong, right))
+
+            # translation-positional-used: Check "string to translate"
+            # to check "%s %s..." used where the position can't be changed
+            str2translate = arg.as_string()
+            printf_args = (
+                misc.WrapperModuleChecker.
+                _get_printf_str_args_kwargs(str2translate))
+            if isinstance(printf_args, tuple) and len(printf_args) >= 2:
+                # Return tuple for %s and dict for %(varname)s
+                # Check just the following cases "%s %s..."
+                self.add_message('translation-positional-used',
+                                 node=node, args=(str2translate,))
 
         # SQL Injection
         if isinstance(node, astroid.Call) and node.args and \
